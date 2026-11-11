@@ -1,67 +1,226 @@
-cmake_minimum_required(VERSION 3.10)
-project(OpenGLWindow)
+cmake_minimum_required(VERSION 4.4)
 
-# Настройка C++ стандарта
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+project(JavaCoreFoundation)
+add_executable(${PROJECT_NAME})
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
-# Отключаем сборку лишних элементов GLFW
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+target_link_libraries(${PROJECT_NAME} PRIVATE opengl32)
 
-# Оптимизация сборки Assimp
-set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE) 
-set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)  
+add_subdirectory("dependencies/glfw")
+add_subdirectory("dependencies/glm")
+add_subdirectory("dependencies/assimp")
 
-# Подключаем исходный код зависимостей
-add_subdirectory(dependencies/glfw)
-add_subdirectory(dependencies/assimp)
+add_library(GLAD STATIC)
 
-# Создаем исполняемый файл проекта
-add_executable(${PROJECT_NAME} 
-    main.cpp 
-    stb_image.cpp
-    dependencies/glad/src/glad.c
-    camera.hpp
+target_sources(GLAD
+  PRIVATE
+    "dependencies/glad/src/glad.c"
+
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS "dependencies/glad/include"
+    FILES
+      "dependencies/glad/include/KHR/khrplatform.h"
+      "dependencies/glad/include/glad/glad.h"
 )
 
-# Указываем пути к заголовочным файлам для нашего проекта
-target_include_directories(${PROJECT_NAME} PRIVATE
-    dependencies/glad/include
-    dependencies/glfw/include
-    dependencies/glm
-    dependencies/stb
-    
-    # Исходные инклуды Assimp
-    dependencies/assimp/include
-    # ВАЖНО: сгенерированные CMake файлы Assimp (здесь лежит config.h)
-    ${CMAKE_CURRENT_BINARY_DIR}/dependencies/assimp/include
-    ${CMAKE_CURRENT_BINARY_DIR}/dependencies/assimp
+add_library(STB STATIC)
+
+target_sources(STB
+  PRIVATE
+    "dependencies/stb/src/stb_image.cpp"
+
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS "dependencies/stb/include"
+    FILES
+      "dependencies/stb/include/stb_image.h"
 )
 
-# Связываем проект с библиотеками
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw assimp)
+add_library(physx INTERFACE)
+option(PHYSX_BUILD_TYPE "The build type of PhysX, i.e., one of {debug, checked, profile, release}" "debug")
+target_compile_options(physx INTERFACE /W3)
 
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE opengl32)
-elseif(NOT APPLE)
-    target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL)
-else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework OpenGL")
+if(NOT CMAKE_BUILD_TYPE)
+    if(PHYSX_BUILD_TYPE STREQUAL "debug" OR PHYSX_BUILD_TYPE STREQUAL "checked")
+        set(CMAKE_BUILD_TYPE "Debug")
+    endif()
 endif()
 
-# ====================================================================
-# АВТОМАТИЧЕСКОЕ КОПИРОВАНИЕ РЕСУРСОВ В ПАПКУ СБОРКИ (build)
-# ====================================================================
+target_include_directories(
+  physx 
+  INTERFACE
+  "dependencies/physx/physx/include"
+  )
+target_link_directories(physx 
+  INTERFACE
+  "dependencies/physx/physx/bin/win.x86_64.vc143.md/${PHYSX_BUILD_TYPE}"
+  )
 
-# Копируем всю папку shaders
-# file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-#      DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-add_custom_command(TARGET OpenGLWindow POST_BUILD
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("Building snippet in debug with PhysX ${PHYSX_BUILD_TYPE} configuration")
+    target_compile_definitions(physx INTERFACE _DEBUG)
+    # add_compile_definitions(_DEBUG)
+else()
+    message("Building snippet in release configuration with PhysX ${PHYSX_BUILD_TYPE} configuration")
+    target_compile_definitions(physx INTERFACE _NDEBUG)
+    # add_compile_definitions(NDEBUG)
+endif()
+
+target_link_libraries(physx
+  INTERFACE
+    PhysXExtensions_static_64 
+    PhysX_64
+    PhysXPvdSDK_static_64
+    PhysXCommon_64
+    PhysXFoundation_64
+    )
+    
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-    "${CMAKE_CURRENT_BINARY_DIR}/shaders"
+        "${CMAKE_SOURCE_DIR}/dependencies/physx/physx/bin/win.x86_64.vc143.md/${PHYSX_BUILD_TYPE}"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+    COMMENT "Copy PhysX runtime DLLs"
 )
+
+foreach(dll PhysX_64 PhysXCommon_64 PhysXFoundation_64)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/dependencies/physx/physx/bin/win.x86_64.vc143.md/${PHYSX_BUILD_TYPE}/${dll}.dll")
+        message(FATAL_ERROR "Missing ${dll}.dll in PhysX ${PHYSX_BUILD_TYPE} folder")
+    endif()
+endforeach()
+
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+
+    physx
+    glfw
+    assimp
+    GLAD
+    STB
+    glm::glm
+)
+
+file(GLOB PROJECT_HEADERS "include/*.hpp")
+file(GLOB PROJECT_SOURCES "src/*.cpp")
+
+target_sources(${PROJECT_NAME}
+    PRIVATE
+        ${PROJECT_SOURCES}
+
+    PUBLIC
+        FILE_SET HEADERS
+        BASE_DIRS "include"
+        FILES
+            ${PROJECT_HEADERS}
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
+    COMMENT "Copy assets directory"
+)
+
+
+
+# # ------------------------------------------------------------------------------
+# # 1. Подключение заголовочных файлов (Include Directories)
+# # ------------------------------------------------------------------------------
+
+# # Подключаем папку dependencies, чтобы можно было писать #include <glad/glad.h> и т.д.
+# include_directories(${CMAKE_SOURCE_DIR}/dependencies)
+
+# set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+# set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+# set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+# # Явно указываем пути к include-папкам библиотек (если они нужны)
+# include_directories(${CMAKE_SOURCE_DIR}/dependencies/glfw/include)
+# include_directories(${CMAKE_SOURCE_DIR}/dependencies/glad/include)
+# include_directories(${CMAKE_SOURCE_DIR}/dependencies/glm)
+
+# set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+# set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+# set(ASSIMP_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+# set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+
+# include_directories(${CMAKE_SOURCE_DIR}/dependencies/assimp/include)
+# include_directories(${CMAKE_SOURCE_DIR}/dependencies/stb)
+
+# # ------------------------------------------------------------------------------
+# # 2. Сборка сторонних библиотек (GLFW, GLAD, ASSIMP)
+# # ------------------------------------------------------------------------------
+
+# # --- GLFW ---
+# add_subdirectory(dependencies/glfw)
+
+# # --- GLAD ---
+# set(GLAD_SRC ${CMAKE_SOURCE_DIR}/dependencies/glad/src/glad.c)
+
+# # --- ASSIMP ---
+# add_subdirectory(dependencies/assimp)
+
+# # ------------------------------------------------------------------------------
+# # 3. Настройка и подключение PhysX
+# # ------------------------------------------------------------------------------
+
+# # Путь к корню исходников PhysX (согласно вашей структуре: dependencies/physx/physx)
+# set(PHYSX_ROOT_DIR ${CMAKE_SOURCE_DIR}/dependencies/physx)
+# set(PHYSX_COMPILER_DIR "vc143")
+# set(PHYSX_BIN_DIR "${PHYSX_ROOT_DIR}/physx/bin/win.x86_64.${PHYSX_COMPILER_DIR}.md/$<CONFIG>")
+# include_directories("${PHYSX_ROOT_DIR}/physx/include")
+
+# # ------------------------------------------------------------------------------
+# # 4. Сборка вашего проекта
+# # ------------------------------------------------------------------------------
+
+# # Собираем список всех .cpp файлов в корне (main.cpp, stb_image.cpp и т.д.)
+# file(GLOB SOURCES "*.cpp")
+
+# # Создаем исполняемый файл
+# target_compile_features(MathFunctions PRIVATE cxx_std_20)
+
+# target_link_directories(${PROJECT_NAME} PRIVATE ${PHYSX_BIN_DIR})
+# # ------------------------------------------------------------------------------
+# # 5. Линковка (Link Libraries)
+# # ------------------------------------------------------------------------------
+
+
+# # add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+# #     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PHYSX_BIN_DIR}/${CONFIG}/PhysX_64.dll" "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+# #     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PHYSX_BIN_DIR}/${CONFIG}/PhysXCommon_64.dll" "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+# #     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PHYSX_BIN_DIR}/${CONFIG}/PhysXFoundation_64.dll" "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+# # )
+
+
+
+# # Линкуем GLFW, Assimp и PhysX
+# target_link_libraries(${PROJECT_NAME} PRIVATE 
+#     glfw
+#     assimp
+#     PhysX_64
+#     PhysXCommon_64
+#     PhysXFoundation_64
+#     PhysXExtensions_static_64
+# )
+
+# # Для Linux/macOS нужно подключить OpenGL и dl
+# if (UNIX)
+#     target_link_libraries(${PROJECT_NAME} PRIVATE GL dl)
+# endif()
+
+# # Если вы используете Windows, возможно, понадобится opengl32
+# if (WIN32)
+#     target_link_libraries(${PROJECT_NAME} PRIVATE opengl32)
+# endif()
+
+# # ------------------------------------------------------------------------------
+# # 6. Копирование ресурсов (шейдеры, модели, текстуры) рядом с .exe
+# # ------------------------------------------------------------------------------
+
+# add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy_directory
+#         ${CMAKE_SOURCE_DIR}/shaders
+#         $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+#     COMMENT "Копирование папки shaders"
+# )
