@@ -44,7 +44,7 @@ public:
         glfwMakeContextCurrent(mWindow);
         glfwSetFramebufferSizeCallback(mWindow, framebuffer_size_callback);
         glfwSetCursorPosCallback(mWindow, mouse_callback);
-        glfwSetScrollCallback(mWindow, scroll_callback);
+        glfwSetScrollCallback(mWindow, scroll_callback); 
         
 	    glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -86,7 +86,7 @@ private:
     inline static unsigned int mScreenWidth = 600;
     inline static unsigned int mScreenHeight = 400;
     inline static const char* mTitle = "Window";
-    inline static Camera mCamera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));;
+    inline static Camera mCamera = Camera(glm::vec3(-0.6f, 5.83f, 19.5f));;
     inline static float mLastX =  mScreenWidth / 2.0f;
     inline static float mLastY = mScreenHeight / 2.0f;
 
@@ -127,23 +127,23 @@ private:
     {
         if (mFirstMouse)
         {
-            mLastX = xpos;
-            mLastY = ypos;
+            mLastX = (float)xpos;
+            mLastY = (float)ypos;
             mFirstMouse = false;
         }
 
-        float xoffset = xpos - mLastX;
-        float yoffset = mLastY - ypos;
+        float xoffset = (float)xpos - mLastX;
+        float yoffset = mLastY - (float)ypos;
 
-        mLastX = xpos;
-        mLastY = ypos;
+        mLastX = (float)xpos;
+        mLastY = (float)ypos;
 
         mCamera.ProcessMouseMovement(xoffset, yoffset);
     }
 
     static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     {
-        mCamera.ProcessMouseScroll(yoffset);
+        mCamera.ProcessMouseScroll((float)yoffset);
     }
 
 };
