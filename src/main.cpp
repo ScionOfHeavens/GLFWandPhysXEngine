@@ -24,7 +24,6 @@ int main()
 
     Model ourModel("assets/meshes/Cube/Cube.obj"); 
 
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	Window::setRenderFunc([&ourShader, &ourModel](Camera camera, float screenWidth, float screenHeight){
         
 		ourShader.use();
@@ -35,8 +34,8 @@ int main()
         ourShader.setMat4("view", view);
 
         glm::mat4 model = glm::make_mat4(Physics::stepPhysics().front());
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // смещаем вниз чтобы быть в центре сцены
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// объект слишком большой для нашей сцены, поэтому немного уменьшим его
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
         ourShader.setMat4("model", model);
         ourModel.Draw(ourShader);
 	});
