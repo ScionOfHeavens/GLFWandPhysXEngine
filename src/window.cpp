@@ -50,7 +50,6 @@ void Window::buildContext() {
 }
 
 void Window::run() {
-
     while (!glfwWindowShouldClose(mWindow))
     {
         float currentFrame = glfwGetTime();
