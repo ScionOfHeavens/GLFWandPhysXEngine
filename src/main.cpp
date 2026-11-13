@@ -11,7 +11,7 @@ int main()
 {
 	Window::init();
 	Window::setWindowSize(800, 600);
-	Window::setWindowTitle("Java Core project");
+	Window::setWindowTitle("GLFWandPhysXEngine");
     Window::buildContext();
     Physics::initPhysics();
     Physics::CreatePlane();
