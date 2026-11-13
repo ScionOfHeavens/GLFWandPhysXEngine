@@ -1,14 +1,7 @@
 #pragma once
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <stb_image.h>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-
-#include "shader_program_builder.hpp"
 #include "camera.hpp"
 
 #include <iostream>
@@ -16,134 +9,32 @@
 
 class Window{
 public:
-    static void init() {
-        glfwInit();
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        
-    #ifdef __APPLE__
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // раскомментируйте эту строку, если используете macOS
-    #endif
-    }
-
-    static void setWindowSize(unsigned int screenWidth, unsigned int screenHeight){
-        mScreenWidth = screenWidth;
-        mScreenHeight = screenHeight;
-    }
-
-    static void setWindowTitle(const char* title){
-        mTitle = title;
-    }
-
-    static void setRenderFunc(std::function<void(Camera, float, float)> renderStepFunc) { mRenderStepfunc = renderStepFunc; }
-
-    static void buildContext() {
-        mWindow= glfwCreateWindow(mScreenWidth, mScreenHeight, mTitle, NULL, NULL);
-
-        glfwMakeContextCurrent(mWindow);
-        glfwSetFramebufferSizeCallback(mWindow, framebuffer_size_callback);
-        glfwSetCursorPosCallback(mWindow, mouse_callback);
-        glfwSetScrollCallback(mWindow, scroll_callback); 
-        
-	    glfwSetInputMode(mWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-        if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-        {
-            std::cout << "Failed to initialize GLAD" << std::endl;
-            return;
-        }
-
-	    glEnable(GL_DEPTH_TEST);
-    }
-
-    static void run() {
-
-        while (!glfwWindowShouldClose(mWindow))
-        {
-            // Логическая часть работы со временем для каждого кадра
-            float currentFrame = glfwGetTime();
-            mDeltaTime = currentFrame - mLastFrame;
-            mLastFrame = currentFrame;
-            
-            // Обработка ввода
-            processInput(mWindow);
-
-            // Рендеринг
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // очищаем буфер цвета и буфер глубины
-
-            
-            mRenderStepfunc(mCamera, mScreenWidth, mScreenHeight);
-
-            // glfw: обмен содержимым front- и back- буферов. Отслеживание событий ввода/вывода (была ли нажата/отпущена кнопка, перемещен курсор мыши и т.п.)
-            glfwSwapBuffers(mWindow);
-            glfwPollEvents();
-        }
-    }
+    static void init();
+    static void setWindowSize(unsigned int screenWidth, unsigned int screenHeight);
+    static void setWindowTitle(const char* title);
+    static void setRenderFunc(std::function<void(Camera, float, float)> renderStepFunc);
+    static void buildContext();
+    static void run();
 
 private:
-    inline static unsigned int mScreenWidth = 600;
-    inline static unsigned int mScreenHeight = 400;
-    inline static const char* mTitle = "Window";
-    inline static Camera mCamera = Camera(glm::vec3(-0.6f, 5.83f, 19.5f));;
-    inline static float mLastX =  mScreenWidth / 2.0f;
-    inline static float mLastY = mScreenHeight / 2.0f;
+    static unsigned int mScreenWidth;
+    static unsigned int mScreenHeight;
+    static const char* mTitle;
+    static Camera mCamera;
+    static float mLastX;
+    static float mLastY;
 
-    inline static bool mFirstMouse = true;
+    static bool mFirstMouse;
 
-    inline static float mDeltaTime = 0.0f;
-    inline static float mLastFrame = 0.0f;
+    static float mDeltaTime;
+    static float mLastFrame;
 
-    inline static GLFWwindow* mWindow;
+    static GLFWwindow* mWindow;
 
-    inline static std::function<void(Camera, float, float)>mRenderStepfunc = [](Camera, float, float){};
-    
-    static void processInput(GLFWwindow* window)
-    {
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
+    static std::function<void(Camera, float, float)>mRenderStepfunc;
 
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            mCamera.ProcessKeyboard(FORWARD, mDeltaTime);
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            mCamera.ProcessKeyboard(BACKWARD, mDeltaTime);
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            mCamera.ProcessKeyboard(LEFT, mDeltaTime);
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            mCamera.ProcessKeyboard(RIGHT, mDeltaTime);
-        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-            mCamera.ProcessKeyboard(UP, mDeltaTime);
-        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-            mCamera.ProcessKeyboard(DOWN, mDeltaTime);
-    }
-
-    static void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-    {
-        glViewport(0, 0, width, height);
-    }
-
-    static void mouse_callback(GLFWwindow* window, double xpos, double ypos)
-    {
-        if (mFirstMouse)
-        {
-            mLastX = (float)xpos;
-            mLastY = (float)ypos;
-            mFirstMouse = false;
-        }
-
-        float xoffset = (float)xpos - mLastX;
-        float yoffset = mLastY - (float)ypos;
-
-        mLastX = (float)xpos;
-        mLastY = (float)ypos;
-
-        mCamera.ProcessMouseMovement(xoffset, yoffset);
-    }
-
-    static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
-    {
-        mCamera.ProcessMouseScroll((float)yoffset);
-    }
-
+    static void processInput(GLFWwindow* window);
+    static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+    static void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+    static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 };
