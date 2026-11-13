@@ -1,3 +1,5 @@
+#include <glm/glm.hpp>
+
 #include "physics.hpp"
 #include "shader_program_builder.hpp"
 #include "model.hpp"
@@ -9,7 +11,9 @@ int main()
 	Window::setWindowSize(800, 600);
 	Window::setWindowTitle("Java Core project");
     Window::buildContext();
-    initPhysics();
+    Physics::initPhysics();
+    Physics::CreatePlane();
+    Physics::CreateCube();
 
     ShaderProgramBuilder builder;
 	ShaderProgram ourShader = builder.withVertexShader("assets/shaders/shader.vs")
@@ -28,7 +32,7 @@ int main()
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
-        glm::mat4 model = glm::make_mat4(stepPhysics().front());
+        glm::mat4 model = glm::make_mat4(Physics::stepPhysics().front());
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f)); // смещаем вниз чтобы быть в центре сцены
         model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));	// объект слишком большой для нашей сцены, поэтому немного уменьшим его
         ourShader.setMat4("model", model);
@@ -38,6 +42,6 @@ int main()
 	Window::run();
 
     glfwTerminate();
-    CleanupPhysics();
+    Physics::CleanupPhysics();
     return 0;
 }
